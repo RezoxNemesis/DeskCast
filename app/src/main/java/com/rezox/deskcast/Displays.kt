@@ -39,10 +39,14 @@ object Displays {
      * Launch [intent] on [displayId]. With freeform enabled, [launchBounds] becomes the window
      * rectangle; without it Android shows the app full screen on that display.
      */
-    fun launchOn(c: Context, intent: Intent, displayId: Int, launchBounds: Rect?): Boolean {
+    const val WINDOWING_FULLSCREEN = 1
+    const val WINDOWING_FREEFORM = 5
+
+    fun launchOn(c: Context, intent: Intent, displayId: Int, launchBounds: Rect?, windowingMode: Int? = null): Boolean {
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         val opts = ActivityOptions.makeBasic().setLaunchDisplayId(displayId)
         if (launchBounds != null) opts.setLaunchBounds(launchBounds)
+        if (windowingMode != null) setWindowingMode(opts, windowingMode)
         return try {
             c.startActivity(intent, opts.toBundle())
             true
@@ -55,4 +59,20 @@ object Displays {
             false
         }
     }
+
+    /**
+     * Freeform vs full screen per launch. This is a hidden Android API; it becomes reachable once
+     * DeskCast has relaxed the hidden-API policy (part of "Enable desktop windows").
+     * If it isn't reachable, launch bounds alone still give a window on freeform displays.
+     */
+    private fun setWindowingMode(opts: ActivityOptions, mode: Int) {
+        try {
+            ActivityOptions::class.java.getMethod("setLaunchWindowingMode", Int::class.javaPrimitiveType).invoke(opts, mode)
+        } catch (_: Throwable) {
+        }
+    }
+
+    /** Windowing mode + bounds for an app profile on a desktop. */
+    fun windowingFor(p: AppProfile): Int =
+        if (p.mode == WindowMode.FULLSCREEN) WINDOWING_FULLSCREEN else WINDOWING_FREEFORM
 }

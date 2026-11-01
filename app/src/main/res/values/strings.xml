@@ -2,6 +2,7 @@
 <resources>
     <string name="app_name">DeskCast</string>
     <string name="desktop_label">DeskCast Desktop</string>
+    <string name="phone_desktop_label">DeskCast Phone Desktop</string>
     <string name="control_service_label">DeskCast control</string>
     <string name="control_service_desc">Lets DeskCast show a mouse cursor on the external screen, turn your phone into a touchpad, handle desktop keyboard shortcuts (Win, Alt+Tab, Alt+F4) and map keyboard keys to on-screen game controls. DeskCast only reads which app window is in front so it can apply your per-app settings; it does not read or store what you type.</string>
 </resources>

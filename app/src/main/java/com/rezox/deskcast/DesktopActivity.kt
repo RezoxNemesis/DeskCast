@@ -5,7 +5,10 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.content.pm.ActivityInfo
 import android.content.pm.ResolveInfo
+import android.view.WindowInsets
+import android.view.WindowInsetsController
 import android.graphics.Color
 import android.graphics.Rect
 import android.graphics.drawable.Drawable
@@ -37,14 +40,36 @@ import android.widget.TextView
 import java.util.Date
 import java.util.concurrent.Executors
 
-/** The desktop that runs on the external screen: wallpaper, pinned apps, taskbar and start menu. */
-class DesktopActivity : Activity() {
+/** The phone's own screen turned into a desktop (no monitor needed). */
+class PhoneDesktopActivity : DesktopActivity() {
+    override val phoneMode = true
+}
+
+/**
+ * The desktop: wallpaper, pinned apps, taskbar and start menu. Runs on the external screen, or —
+ * as [PhoneDesktopActivity] — on the phone itself in landscape.
+ */
+open class DesktopActivity : Activity() {
 
     companion object {
+        /** Desktop on the external screen. */
         var current: DesktopActivity? = null
             private set
+        /** Desktop on the phone's own screen. */
+        var phoneCurrent: DesktopActivity? = null
+            private set
         const val EXTRA_OPEN_START = "open_start"
+
+        /** The desktop the Win key should act on. */
+        fun active(): DesktopActivity? = current ?: phoneCurrent
+
+        fun startPhoneDesktop(c: Context) {
+            PhoneHome.setEnabled(c, true)
+            Displays.launchOn(c, Intent(c, PhoneDesktopActivity::class.java), Display.DEFAULT_DISPLAY, null, Displays.WINDOWING_FULLSCREEN)
+        }
     }
+
+    open val phoneMode = false
 
     data class App(val pkg: String, val label: String, val ri: ResolveInfo)
 
@@ -69,7 +94,7 @@ class DesktopActivity : Activity() {
     private lateinit var menuGrid: GridView
     private lateinit var modeChip: TextView
 
-    private val taskbarH get() = Ui.dp(this, 56)
+    private val taskbarH get() = Ui.dp(this, if (phoneMode) 48 else 56)
 
     fun displayIdOrNull(): Int? = try { display?.displayId } catch (_: Exception) { null }
 
@@ -77,8 +102,14 @@ class DesktopActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        current = this
+        if (phoneMode) {
+            phoneCurrent = this
+            requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+        } else {
+            current = this
+        }
         buildUi()
+        if (phoneMode) hideSystemBars()
         loadApps()
         if (intent?.getBooleanExtra(EXTRA_OPEN_START, false) == true) main.post { showStart(true) }
         registerReceiver(batteryRx, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
@@ -93,6 +124,7 @@ class DesktopActivity : Activity() {
     override fun onResume() {
         super.onResume()
         resumedTop = true
+        if (phoneMode) hideSystemBars()
         refreshModeChip()
         refreshTaskbar()
     }
@@ -104,6 +136,7 @@ class DesktopActivity : Activity() {
 
     override fun onDestroy() {
         if (current === this) current = null
+        if (phoneCurrent === this) phoneCurrent = null
         try { unregisterReceiver(batteryRx) } catch (_: Exception) {}
         main.removeCallbacksAndMessages(null)
         io.shutdownNow()
@@ -131,12 +164,32 @@ class DesktopActivity : Activity() {
     fun toggleStartMenu() {
         if (!resumedTop) {
             val id = displayIdOrNull() ?: return
-            val i = Intent(this, DesktopActivity::class.java).putExtra(EXTRA_OPEN_START, true)
-            Displays.launchOn(this, i, id, null)
+            val i = Intent(this, javaClass).putExtra(EXTRA_OPEN_START, true)
+            Displays.launchOn(this, i, id, null, if (phoneMode) Displays.WINDOWING_FULLSCREEN else null)
             return
         }
         showStart(startMenu.visibility != View.VISIBLE)
     }
+
+    private fun hideSystemBars() {
+        window.insetsController?.let {
+            it.hide(WindowInsets.Type.systemBars())
+            it.systemBarsBehavior = WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        }
+    }
+
+    /** Leaves phone desktop mode and returns to the normal phone launcher. */
+    fun exitPhoneDesktop() {
+        PhoneHome.setEnabled(this, false)
+        requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+        finish()
+        try {
+            startActivity(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        } catch (_: Exception) {}
+    }
+
+    private fun windowsReady() =
+        if (phoneMode) DesktopFlags.phoneFreeformReady(this) else DesktopFlags.freeformReady(this)
 
     // ---------- UI ----------
 
@@ -288,10 +341,16 @@ class DesktopActivity : Activity() {
             if (i.resolveActivity(packageManager) != null) launchIntent(i, null)
             else launchIntent(Intent(android.provider.Settings.ACTION_INTERNAL_STORAGE_SETTINGS), null)
         })
+        if (phoneMode) {
+            footer.addView(footBtn("⏻  Exit desktop") { exitPhoneDesktop() })
+        }
         startMenu.addView(footer)
 
-        root.addView(startMenu, FrameLayout.LayoutParams(Ui.dp(c, 620), ViewGroup.LayoutParams.MATCH_PARENT, Gravity.BOTTOM or Gravity.START).apply {
-            leftMargin = Ui.dp(c, 12); bottomMargin = taskbarH + Ui.dp(c, 10); topMargin = Ui.dp(c, 60)
+        val dm = resources.displayMetrics
+        val longEdge = maxOf(dm.widthPixels, dm.heightPixels)
+        val menuW = minOf(Ui.dp(c, 620), (longEdge * 0.62f).toInt())
+        root.addView(startMenu, FrameLayout.LayoutParams(menuW, ViewGroup.LayoutParams.MATCH_PARENT, Gravity.BOTTOM or Gravity.START).apply {
+            leftMargin = Ui.dp(c, 12); bottomMargin = taskbarH + Ui.dp(c, 10); topMargin = Ui.dp(c, if (phoneMode) 16 else 60)
         })
 
         root.setOnClickListener { if (startMenu.visibility == View.VISIBLE) showStart(false) }
@@ -364,7 +423,7 @@ class DesktopActivity : Activity() {
     private fun refreshModeChip() {
         if (!::modeChip.isInitialized) return
         modeChip.text = when {
-            DesktopFlags.freeformReady(this) -> "Desktop windows on"
+            windowsReady() -> if (phoneMode) "Phone desktop · windows on" else "Desktop windows on"
             else -> "Full-screen apps · tap to enable windows"
         }
     }
@@ -375,18 +434,25 @@ class DesktopActivity : Activity() {
     fun launch(pkg: String, modeOverride: WindowMode? = null) {
         val intent = packageManager.getLaunchIntentForPackage(pkg) ?: return
         val profile = Profiles.get(this, pkg).let { if (modeOverride != null) it.copy(mode = modeOverride) else it }
-        val bounds = if (DesktopFlags.freeformReady(this)) {
+        if (windowsReady()) {
             val d = display ?: return
-            Profiles.boundsFor(profile, Displays.bounds(this, d), taskbarH, cascade++)
-        } else null
-        launchIntent(intent, bounds)
+            val bounds = Profiles.boundsFor(profile, Displays.bounds(this, d), taskbarH, cascade++)
+            launchIntent(intent, bounds, Displays.windowingFor(profile))
+        } else {
+            launchIntent(intent, null)
+        }
         recent.remove(pkg); recent.add(0, pkg)
         refreshTaskbar()
     }
 
-    private fun launchIntent(intent: Intent, bounds: Rect?) {
+    private fun launchIntent(intent: Intent, bounds: Rect?, windowing: Int? = null) {
         val id = displayIdOrNull() ?: return
-        Displays.launchOn(this, intent, id, bounds)
+        // Plain launches (settings, files) open as a window too when windows are available.
+        val mode = windowing ?: if (windowsReady() && bounds == null) Displays.WINDOWING_FREEFORM else null
+        val b = bounds ?: if (mode == Displays.WINDOWING_FREEFORM) {
+            display?.let { Profiles.boundsFor(AppProfile(""), Displays.bounds(this, it), taskbarH, cascade++) }
+        } else null
+        Displays.launchOn(this, intent, id, b, mode)
     }
 
     private fun openOnPhone(intent: Intent) {

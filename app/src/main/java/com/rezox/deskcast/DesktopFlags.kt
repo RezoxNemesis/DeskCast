@@ -41,6 +41,16 @@ object DesktopFlags {
                 false
             }
         }
+        // Lets DeskCast pick "window" vs "full screen" per app launch (same approach as Taskbar/DeX-style launchers).
+        try {
+            Settings.Global.putString(c.contentResolver, HIDDEN_API, if (on) "1" else null)
+        } catch (_: Exception) {
+        }
         return ok
     }
+
+    private const val HIDDEN_API = "hidden_api_policy"
+
+    /** Freeform windows on the phone's own screen only need the freeform switch. */
+    fun phoneFreeformReady(c: Context): Boolean = isOn(c, FREEFORM)
 }

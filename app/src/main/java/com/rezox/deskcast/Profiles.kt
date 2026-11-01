@@ -147,6 +147,10 @@ object Settings2 {
     fun autoDesktop(c: Context) = p(c).getBoolean("autoDesktop", true)
     fun setAutoDesktop(c: Context, v: Boolean) = p(c).edit().putBoolean("autoDesktop", v).apply()
 
+    /** Start phone desktop mode when a mouse or keyboard is plugged in and no monitor is connected. */
+    fun autoPhoneDesktop(c: Context) = p(c).getBoolean("autoPhoneDesktop", true)
+    fun setAutoPhoneDesktop(c: Context, v: Boolean) = p(c).edit().putBoolean("autoPhoneDesktop", v).apply()
+
     /** 0 = native, otherwise max long edge in px. */
     fun streamMaxEdge(c: Context) = p(c).getInt("streamEdge", 1920)
     fun setStreamMaxEdge(c: Context, v: Int) = p(c).edit().putInt("streamEdge", v).apply()

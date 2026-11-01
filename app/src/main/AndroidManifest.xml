@@ -50,6 +50,32 @@
             android:theme="@style/Theme.DeskCast.Desktop" />
 
         <activity
+            android:name=".PhoneDesktopActivity"
+            android:configChanges="screenSize|smallestScreenSize|screenLayout|orientation|density|keyboard|keyboardHidden|navigation|uiMode"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:label="@string/phone_desktop_label"
+            android:launchMode="singleTask"
+            android:resizeableActivity="true"
+            android:screenOrientation="sensorLandscape"
+            android:taskAffinity="com.rezox.deskcast.phonedesktop"
+            android:theme="@style/Theme.DeskCast.Desktop" />
+
+        <!-- Enabled only while phone desktop mode is on, so Home can return to the desktop. -->
+        <activity-alias
+            android:name=".PhoneHome"
+            android:enabled="false"
+            android:exported="true"
+            android:label="@string/phone_desktop_label"
+            android:targetActivity=".PhoneDesktopActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.HOME" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity
             android:name=".MirrorActivity"
             android:configChanges="screenSize|smallestScreenSize|screenLayout|orientation|density|keyboard|keyboardHidden|navigation"
             android:excludeFromRecents="true"

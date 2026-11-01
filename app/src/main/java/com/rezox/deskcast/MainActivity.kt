@@ -95,6 +95,31 @@ class MainActivity : Activity() {
         }
         content.addView(screen)
 
+        // ---- phone desktop ----
+        content.addView(Ui.section(c, "Phone desktop (no monitor)"))
+        val phone = Ui.card(c)
+        phone.addView(Ui.text(c, "Turns this phone's own screen into a desktop: landscape, taskbar, start menu and apps in movable windows. Mouse, keyboard, shortcuts and game key mapping work the same as on a monitor.", 14f, Ui.MUTED))
+        val phoneWin = DesktopFlags.phoneFreeformReady(c)
+        phone.addView(Ui.statusRow(c, if (phoneWin) true else null, if (phoneWin) "Windows ready" else "Apps will open full screen",
+            if (phoneWin) "Apps open as windows on the phone screen." else "Turn on Desktop windows in Setup below for movable windows."))
+        phone.addView(Ui.button(c, if (DesktopActivity.phoneCurrent != null) "Return to phone desktop" else "Start phone desktop", primary = ext.isEmpty()) {
+            DesktopActivity.startPhoneDesktop(c)
+        })
+        val homeDefault = PhoneHome.isDefault(c)
+        phone.addView(Ui.statusRow(c, if (homeDefault) true else null, "Home button returns to the desktop",
+            if (homeDefault) "On" else "Optional: after starting the desktop once, choose “DeskCast Phone Desktop” as the Home app. It is removed again when you exit desktop mode."))
+        if (!homeDefault) phone.addView(Ui.button(c, "Choose Home app") {
+            PhoneHome.setEnabled(c, true); PhoneHome.openHomeSettings(c)
+        })
+        phone.addView(Switch(c).apply {
+            text = "Start automatically when a mouse or keyboard is connected (and no monitor)"
+            setTextColor(Ui.TEXT); textSize = 15f
+            isChecked = Settings2.autoPhoneDesktop(c)
+            setOnCheckedChangeListener { _, v -> Settings2.setAutoPhoneDesktop(c, v) }
+            setPadding(0, Ui.dp(c, 10), 0, 0)
+        })
+        content.addView(phone)
+
         // ---- capture status ----
         val ps = ProjectionService.instance
         if (ps?.mode != null) {
@@ -144,7 +169,7 @@ class MainActivity : Activity() {
 
         val canWrite = DesktopFlags.canWrite(c)
         val flagsOn = DesktopFlags.allOn(c)
-        setup.addView(Ui.statusRow(c, if (flagsOn) true else if (canWrite) null else false, "Desktop windows on the big screen",
+        setup.addView(Ui.statusRow(c, if (flagsOn) true else if (canWrite) null else false, "Desktop windows (monitor and phone desktop)",
             when {
                 flagsOn -> "On — apps open as movable, resizable windows. If you just turned it on, restart the phone once."
                 canWrite -> "Permission granted — tap Enable, then restart the phone once."

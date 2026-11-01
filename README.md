@@ -4,6 +4,7 @@ Your Android phone as a desktop on any screen.
 
 - **Desktop on the big screen** — plug a USB‑C → HDMI / DisplayPort adapter or dock into the phone and DeskCast opens a desktop there: wallpaper, pinned apps, taskbar, start menu with search, clock and battery.
 - **Every app as a desktop window** — apps open as movable, resizable windows (or maximized / full screen / phone‑shaped), chosen per app. Games default to full screen.
+- **Phone desktop (no monitor)** — the phone's own screen becomes the desktop: landscape, taskbar, start menu, apps in movable windows. Starts automatically when you plug in a mouse or keyboard with no monitor connected (or from the app). Mouse, keyboard, shortcuts and game key mapping work exactly as on a monitor. Exit from the start menu.
 - **Mirror mode for games** — shows the phone screen on the external display, scaled up, composited on the GPU with nothing encoded, so there is no added lag.
 - **Stream to a PC over USB** — for phones without video out: hardware H.264 (no B‑frames, realtime priority) sent over the USB cable, typically 30–60 ms.
 - **Mouse & keyboard** — USB/Bluetooth mouse and keyboard work natively. DeskCast adds Win‑key start menu, Win+D, Alt+Tab, Alt+F4, a phone‑as‑touchpad with a cursor on the big screen, and **keyboard → touch mapping for games** (tap keys and WASD/arrow joysticks).
@@ -28,6 +29,7 @@ Download the APK from the [latest release](../../releases/latest) on your phone 
 | You want | Do this |
 |---|---|
 | Desktop on a monitor/TV | Plug in the adapter. The desktop opens by itself (or tap *Open desktop on big screen*). |
+| Desktop with no monitor | Plug in a mouse/keyboard (USB OTG or Bluetooth) — the phone desktop starts by itself — or tap *Start phone desktop*. Optional: *Choose Home app* → "DeskCast Phone Desktop" so Home returns to the desktop. Start menu → *Exit desktop* to leave. |
 | Open an app | Win key or ⊞ → click it, or just start typing to search. |
 | Choose how an app opens | Right‑click (or long‑press) its icon → *Open as window / maximized / full screen / phone‑shaped*, or *Always open as…* to save it. |
 | Pin to desktop | Right‑click an app → *Pin to desktop*. |

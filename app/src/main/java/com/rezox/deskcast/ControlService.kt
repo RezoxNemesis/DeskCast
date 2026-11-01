@@ -12,6 +12,8 @@ import android.graphics.PixelFormat
 import android.graphics.PointF
 import android.graphics.Rect
 import android.hardware.display.DisplayManager
+import android.hardware.input.InputManager
+import android.view.InputDevice
 import android.os.Handler
 import android.os.Looper
 import android.view.Display
@@ -52,12 +54,35 @@ class ControlService : AccessibilityService() {
         instance = this
         dm = getSystemService(DisplayManager::class.java)
         dm.registerDisplayListener(displayListener, main)
+        getSystemService(InputManager::class.java).registerInputDeviceListener(inputListener, main)
         Displays.primaryExternal(this)?.let { maybeAutoDesktop(it.displayId) }
+    }
+
+    // ---------- mouse / keyboard plugged in with no monitor → phone desktop ----------
+
+    private val inputListener = object : InputManager.InputDeviceListener {
+        override fun onInputDeviceAdded(deviceId: Int) {
+            main.postDelayed({ maybeAutoPhoneDesktop(deviceId) }, 600)
+        }
+        override fun onInputDeviceRemoved(deviceId: Int) {}
+        override fun onInputDeviceChanged(deviceId: Int) {}
+    }
+
+    private fun maybeAutoPhoneDesktop(deviceId: Int) {
+        if (!Settings2.autoPhoneDesktop(this)) return
+        if (Displays.external(this).isNotEmpty()) return
+        if (DesktopActivity.phoneCurrent != null) return
+        val dev = InputDevice.getDevice(deviceId) ?: return
+        if (dev.isVirtual || !dev.isExternal) return
+        val mouse = dev.supportsSource(InputDevice.SOURCE_MOUSE)
+        val keyboard = dev.keyboardType == InputDevice.KEYBOARD_TYPE_ALPHABETIC
+        if (mouse || keyboard) DesktopActivity.startPhoneDesktop(this)
     }
 
     override fun onDestroy() {
         instance = null
         try { dm.unregisterDisplayListener(displayListener) } catch (_: Exception) {}
+        try { getSystemService(InputManager::class.java).unregisterInputDeviceListener(inputListener) } catch (_: Exception) {}
         hideCursor()
         injectors.values.forEach { it.releaseAll() }
         super.onDestroy()
@@ -311,7 +336,7 @@ class ControlService : AccessibilityService() {
         if (code == KeyEvent.KEYCODE_META_LEFT || code == KeyEvent.KEYCODE_META_RIGHT) {
             if (down && e.repeatCount == 0) metaSolo = true
             else if (!down && metaSolo) { metaSolo = false; main.post { toggleStartMenu() } }
-            return DesktopActivity.current != null
+            return DesktopActivity.active() != null
         }
         if (down) metaSolo = false
 
@@ -404,14 +429,18 @@ class ControlService : AccessibilityService() {
     // ---------- desktop helpers ----------
 
     private fun toggleStartMenu() {
-        val d = DesktopActivity.current
+        val d = DesktopActivity.active()
         if (d != null) d.toggleStartMenu()
         else Displays.primaryExternal(this)?.let { openDesktop(it) }
     }
 
     private fun showDesktop() {
-        val d = DesktopActivity.current?.displayIdOrNull()
-        val disp = (if (d != null) dm.getDisplay(d) else null) ?: Displays.primaryExternal(this) ?: return
+        val ext = DesktopActivity.current?.displayIdOrNull()
+        if (ext == null && DesktopActivity.phoneCurrent != null) {
+            DesktopActivity.startPhoneDesktop(this)
+            return
+        }
+        val disp = (if (ext != null) dm.getDisplay(ext) else null) ?: Displays.primaryExternal(this) ?: return
         openDesktop(disp)
     }
 

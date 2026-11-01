@@ -125,6 +125,14 @@ class KeymapEditorActivity : Activity() {
             val prof = Profiles.get(this, p)
             val b = if (DesktopFlags.freeformReady(this)) Profiles.boundsFor(prof, Displays.bounds(this, d), Ui.dp(this, 56), 0) else null
             Displays.launchOn(this, i, d.displayId, b)
+        } else if (DesktopActivity.phoneCurrent != null) {
+            // Phone desktop mode: open as the game's saved window style on the phone screen.
+            val prof = Profiles.get(this, p)
+            val disp = display
+            if (DesktopFlags.phoneFreeformReady(this) && disp != null) {
+                val b = Profiles.boundsFor(prof, Displays.bounds(this, disp), Ui.dp(this, 48), 0)
+                Displays.launchOn(this, i, android.view.Display.DEFAULT_DISPLAY, b, Displays.windowingFor(prof))
+            } else startActivity(i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
         } else startActivity(i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
     }
 
