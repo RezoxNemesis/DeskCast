@@ -13,16 +13,16 @@ Your Android phone as a desktop on any screen.
 
 Download the APK from the [latest release](../../releases/latest) on your phone and install it (allow "install unknown apps" for your browser if asked). Every push to `main` builds a new release automatically.
 
-## One‑time setup
+## One‑time setup (no computer needed)
 
-1. **Turn on DeskCast control** — DeskCast → Setup → *Turn on DeskCast control* → find **DeskCast control** in Accessibility and switch it on. This powers the cursor, touchpad, shortcuts, key mapping and auto‑opening the desktop.
-2. **Enable desktop windows** (needed once for movable windows). On a computer with [platform‑tools](https://developer.android.com/tools/releases/platform-tools), enable USB debugging on the phone and run:
+Open DeskCast — the **Setup** card at the top has three steps and tells you which one is next.
 
-   ```
-   adb shell pm grant com.rezox.deskcast android.permission.WRITE_SECURE_SETTINGS
-   ```
+1. **Unlock DeskCast** — install the free app **Shizuku**, open it and start it with *Wireless debugging* (Shizuku shows each step; Wi‑Fi must be on and Developer options enabled: Settings → About phone → tap *Build number* 7 times). Back in DeskCast tap **Unlock now** → **Allow**.
+   *Have a computer?* Tap *I have a computer instead* and run the one ADB command it shows.
+2. **DeskCast control** turns itself on after step 1 (no hunting in Accessibility, no "restricted setting" errors).
+3. **Desktop windows** turn themselves on. Restart the phone once when DeskCast asks.
 
-   Then in DeskCast tap **Enable desktop windows** and **restart the phone once**. This switches on Android's own freeform‑window and desktop‑on‑external‑display modes. Without it, apps still open on the big screen, but full screen.
+After that, Shizuku isn't needed any more.
 
 ## Using it
 
@@ -35,7 +35,8 @@ Download the APK from the [latest release](../../releases/latest) on your phone 
 | Pin to desktop | Right‑click an app → *Pin to desktop*. |
 | No mouse | DeskCast → *Use phone as touchpad*: move, tap = click, double‑tap‑hold = drag, two fingers = scroll, two‑finger tap = back. |
 | Play a phone game on the TV | *Mirror phone screen*, or open the game on the desktop in full screen. |
-| Keyboard controls in a game | Right‑click the game → *Keyboard mapping…* → *Open game* → *Capture* → *+ Key* / *+ Joystick* → tap the spot → press the key → *Save*. F12 pauses mapping while you type in chat. |
+| Keyboard in a game | Works straight away: WASD moves, arrows swipe (Subway Surfers), Space jumps; Free Fire / PUBG / CODM get their own layouts. Press **F10** in the game to drag keys onto its buttons, then Save. F12 pauses keys while you type in chat. |
+| Mouse in a game (Android 14+) | Click = tap, hold = drag, wheel = swipe, right click = long press (or the scope in shooters). Press **`** or middle‑click for mouse aim in shooters; again for the cursor. Ctrl+Alt+M switches back to a normal mouse. |
 | Phone has no video out | DeskCast → *Start stream*, then on the PC run `pc/deskcast-view.bat` (Windows) or `pc/deskcast-view.sh` (macOS/Linux). Needs `adb` and `ffplay`. |
 
 ### Shortcuts
@@ -47,7 +48,10 @@ Download the APK from the [latest release](../../releases/latest) on your phone 
 | Win + N | Notifications |
 | Alt + Tab | Switch apps |
 | Alt + F4 | Back / close |
-| F12 or Ctrl + Shift + K | Pause game key mapping |
+| F10 | Edit game keys on top of the game |
+| F12 or Ctrl + Shift + K | Pause game keys |
+| ` or middle click | Mouse aim on/off |
+| Ctrl + Alt + M | Normal mouse everywhere on/off |
 
 ## What the hardware has to support
 

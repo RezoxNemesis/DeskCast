@@ -85,7 +85,7 @@ class AppProfilesActivity : Activity() {
             val detail = buildString {
                 append(p.mode.label)
                 if (p.mode == WindowMode.WINDOW) append(" · ${p.widthPct}% × ${p.heightPct}%")
-                if (Profiles.bindings(c, item.pkg).isNotEmpty()) append(if (p.keymapOn) " · keys mapped" else " · keys off")
+                if (Profiles.effectiveBindings(c, item.pkg).isNotEmpty()) append(if (p.keymapOn) " · game keys" else " · keys off")
                 if (!Profiles.has(c, item.pkg)) append(" (default)")
             }
             col.addView(Ui.text(c, detail, 13f, Ui.MUTED))
@@ -133,8 +133,24 @@ class AppProfilesActivity : Activity() {
         box.addView(slider("Width", p.widthPct) { p.widthPct = it })
         box.addView(slider("Height", p.heightPct) { p.heightPct = it })
 
+        box.addView(Ui.text(c, "Mouse", 13f, Ui.MUTED).apply { setPadding(0, Ui.dp(c, 14), 0, 0) })
+        val mice = Ui.column(c)
+        fun drawMice() {
+            mice.removeAllViews()
+            MouseMode.values().forEach { m ->
+                mice.addView(TextView(c).apply {
+                    text = (if (m == p.mouse) "●  " else "○  ") + m.label
+                    textSize = 15f; setTextColor(Ui.TEXT)
+                    setPadding(0, Ui.dp(c, 8), 0, Ui.dp(c, 8))
+                    setOnClickListener { p.mouse = m; drawMice() }
+                })
+            }
+        }
+        drawMice()
+        box.addView(mice)
+
         box.addView(Switch(c).apply {
-            text = "Keyboard → touch mapping"
+            text = "Game keys (keyboard → touch)"
             setTextColor(Ui.TEXT); isChecked = p.keymapOn
             setOnCheckedChangeListener { _, v -> p.keymapOn = v }
             setPadding(0, Ui.dp(c, 14), 0, 0)

@@ -63,9 +63,10 @@ open class DesktopActivity : Activity() {
         /** The desktop the Win key should act on. */
         fun active(): DesktopActivity? = current ?: phoneCurrent
 
-        fun startPhoneDesktop(c: Context) {
+        fun startPhoneDesktop(c: Context, openStart: Boolean = false) {
             PhoneHome.setEnabled(c, true)
-            Displays.launchOn(c, Intent(c, PhoneDesktopActivity::class.java), Display.DEFAULT_DISPLAY, null, Displays.WINDOWING_FULLSCREEN)
+            val i = Intent(c, PhoneDesktopActivity::class.java).putExtra(EXTRA_OPEN_START, openStart)
+            Displays.launchOn(c, i, Display.DEFAULT_DISPLAY, null, Displays.WINDOWING_FULLSCREEN)
         }
     }
 
@@ -149,7 +150,16 @@ open class DesktopActivity : Activity() {
         // The desktop never closes itself on Back.
     }
 
+    override fun onKeyUp(keyCode: Int, event: KeyEvent): Boolean {
+        // Works even before DeskCast control is switched on.
+        if (keyCode == KeyEvent.KEYCODE_META_LEFT || keyCode == KeyEvent.KEYCODE_META_RIGHT) {
+            showStart(startMenu.visibility != View.VISIBLE); return true
+        }
+        return super.onKeyUp(keyCode, event)
+    }
+
     override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
+        if (keyCode == KeyEvent.KEYCODE_META_LEFT || keyCode == KeyEvent.KEYCODE_META_RIGHT) return true
         if (keyCode == KeyEvent.KEYCODE_ESCAPE && startMenu.visibility == View.VISIBLE) { showStart(false); return true }
         // Start typing anywhere on the desktop to search apps.
         if (startMenu.visibility != View.VISIBLE && event.isPrintingKey && !event.isCtrlPressed && !event.isAltPressed) {
@@ -470,7 +480,7 @@ open class DesktopActivity : Activity() {
         m.add(0, 5, 4, "Open phone-shaped")
         m.add(0, 6, 5, if (app.pkg in pinned) "Unpin from desktop" else "Pin to desktop")
         m.add(0, 7, 6, "Always open as… (profile)")
-        m.add(0, 8, 7, "Keyboard mapping…")
+        m.add(0, 8, 7, "Edit game keys (F10)")
         m.add(0, 9, 8, "App info")
         pm.setOnMenuItemClickListener { item ->
             showStart(false)
@@ -486,7 +496,7 @@ open class DesktopActivity : Activity() {
                     Settings2.setPinned(this, list); refreshDesktop()
                 }
                 7 -> openOnPhone(Intent(this, AppProfilesActivity::class.java).putExtra(AppProfilesActivity.EXTRA_PKG, app.pkg))
-                8 -> openOnPhone(Intent(this, KeymapEditorActivity::class.java).putExtra(KeymapEditorActivity.EXTRA_PKG, app.pkg))
+                8 -> { launch(app.pkg); ControlService.instance?.openEditorWhenReady(app.pkg) }
                 9 -> launchIntent(Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:" + app.pkg)), null)
             }
             true

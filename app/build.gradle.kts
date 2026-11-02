@@ -47,3 +47,9 @@ android {
         checkReleaseBuilds = false
     }
 }
+
+dependencies {
+    // Shizuku: lets DeskCast unlock itself on the phone via Wireless debugging (no computer needed).
+    implementation("dev.rikka.shizuku:api:13.1.5")
+    implementation("dev.rikka.shizuku:provider:13.1.5")
+}
