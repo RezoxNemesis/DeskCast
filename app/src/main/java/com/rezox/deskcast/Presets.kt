@@ -96,10 +96,10 @@ object Presets {
 
     /** Names shown in the editor's "Layouts" picker. */
     val all: List<Pair<String, () -> List<KeyBinding>>> = listOf(
-        "Any game (WASD + arrows)" to ::anyGame,
-        "Runner (Subway Surfers style)" to ::runner,
-        "Free Fire" to ::freeFire,
-        "Shooter (PUBG / CODM style)" to ::shooter,
+        "Any game (WASD + arrows)" to { anyGame() },
+        "Runner (Subway Surfers style)" to { runner() },
+        "Free Fire" to { freeFire() },
+        "Shooter (PUBG / CODM style)" to { shooter() },
         "Movement only: arrow keys joystick" to { listOf(arrowsStick(0.15f, 0.72f, 0.075f)) },
     )
 }
