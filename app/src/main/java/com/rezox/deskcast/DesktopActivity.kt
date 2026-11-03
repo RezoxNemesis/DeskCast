@@ -125,7 +125,7 @@ open class DesktopActivity : Activity() {
     override fun onResume() {
         super.onResume()
         resumedTop = true
-        if (phoneMode) hideSystemBars()
+        if (phoneMode) hideSystemBars() else MonitorProbe.applyBestMode(window, display)
         refreshModeChip()
         refreshTaskbar()
     }

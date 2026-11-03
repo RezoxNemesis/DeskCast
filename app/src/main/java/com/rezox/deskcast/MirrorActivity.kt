@@ -31,6 +31,7 @@ class MirrorActivity : Activity() {
         surfaceView = SurfaceView(this)
         root.addView(surfaceView, FrameLayout.LayoutParams(1, 1, Gravity.CENTER))
         setContentView(root)
+        MonitorProbe.applyBestMode(window, display)
         window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_FULLSCREEN or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
 
         surfaceView.holder.addCallback(object : SurfaceHolder.Callback {

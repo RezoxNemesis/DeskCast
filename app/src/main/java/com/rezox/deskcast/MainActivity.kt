@@ -27,6 +27,8 @@ import java.net.NetworkInterface
 
 class MainActivity : Activity() {
 
+    companion object { const val EXTRA_MIRROR = "mirror" }
+
     private val REQ_MIRROR = 11
     private val REQ_STREAM = 12
 
@@ -80,6 +82,7 @@ class MainActivity : Activity() {
             render()
         }
         render()
+        if (intent?.getBooleanExtra(EXTRA_MIRROR, false) == true) { intent.removeExtra(EXTRA_MIRROR); requestCapture(REQ_MIRROR) }
         // The control service takes a moment to start after being switched on.
         main.postDelayed({ render() }, 1200)
     }
@@ -224,16 +227,17 @@ class MainActivity : Activity() {
         val card = Ui.card(c)
         if (ext.isNotEmpty()) {
             ext.forEach { card.addView(Ui.statusRow(c, true, "Monitor connected", Displays.describe(c, it))) }
-            card.addView(Ui.button(c, "Open desktop on the monitor", primary = true) {
+            card.addView(Ui.button(c, "Connect", primary = true) {
                 val d = Displays.primaryExternal(c) ?: return@button
                 Displays.launchOn(c, Intent(c, DesktopActivity::class.java), d.displayId, Displays.bounds(c, d))
             })
             card.addView(Ui.button(c, "Mirror phone screen on the monitor") { requestCapture(REQ_MIRROR) })
         } else {
             card.addView(Ui.statusRow(c, null, "No monitor connected",
-                "Use the phone itself as the desktop, or connect a USB‑C → HDMI adapter (your phone must support video out)."))
+                "Plug in your USB‑C → HDMI adapter and tap Connect — DeskCast finds the monitor or tells you exactly what's wrong."))
+            card.addView(Ui.button(c, "Connect a monitor", primary = true) { startActivity(Intent(c, ConnectActivity::class.java)) })
         }
-        card.addView(Ui.button(c, if (DesktopActivity.phoneCurrent != null) "Return to phone desktop" else "Phone desktop (no monitor)", primary = ext.isEmpty()) {
+        card.addView(Ui.button(c, if (DesktopActivity.phoneCurrent != null) "Return to phone desktop" else "Phone desktop (no monitor)") {
             DesktopActivity.startPhoneDesktop(c)
         })
         card.addView(Ui.button(c, "Use phone as touchpad") {

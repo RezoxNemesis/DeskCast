@@ -61,6 +61,8 @@ class ControlService : AccessibilityService() {
         dm = getSystemService(DisplayManager::class.java)
         dm.registerDisplayListener(displayListener, main)
         getSystemService(InputManager::class.java).registerInputDeviceListener(inputListener, main)
+        val uf = android.content.IntentFilter(android.hardware.usb.UsbManager.ACTION_USB_DEVICE_ATTACHED)
+        if (Build.VERSION.SDK_INT >= 33) registerReceiver(usbRx, uf, RECEIVER_NOT_EXPORTED) else registerReceiver(usbRx, uf)
         Displays.primaryExternal(this)?.let { maybeAutoDesktop(it.displayId) }
         main.post { onFocusMaybeChanged() }
     }
@@ -69,6 +71,7 @@ class ControlService : AccessibilityService() {
         instance = null
         try { dm.unregisterDisplayListener(displayListener) } catch (_: Exception) {}
         try { getSystemService(InputManager::class.java).unregisterInputDeviceListener(inputListener) } catch (_: Exception) {}
+        try { unregisterReceiver(usbRx) } catch (_: Exception) {}
         overlay?.dismiss(); overlay = null
         hideCursor()
         injectors.values.forEach { it.releaseAll() }
@@ -115,10 +118,34 @@ class ControlService : AccessibilityService() {
 
     private var lastAutoDisplay = -1
 
+    /** Adapter plugged in: if no monitor appears within a few seconds, offer the Connect screen. */
+    private val usbRx = object : android.content.BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            main.postDelayed({
+                if (Displays.external(this@ControlService).isEmpty()) notifyConnect("USB device plugged in", "Tap Connect to find your monitor.")
+            }, 3000)
+        }
+    }
+
+    private fun notifyConnect(title: String, text: String) {
+        val nm = getSystemService(android.app.NotificationManager::class.java)
+        nm.createNotificationChannel(android.app.NotificationChannel("connect", "Monitor", android.app.NotificationManager.IMPORTANCE_HIGH))
+        val pi = android.app.PendingIntent.getActivity(this, 3, Intent(this, ConnectActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+            android.app.PendingIntent.FLAG_IMMUTABLE or android.app.PendingIntent.FLAG_UPDATE_CURRENT)
+        val n = android.app.Notification.Builder(this, "connect")
+            .setSmallIcon(android.R.drawable.ic_menu_slideshow)
+            .setContentTitle(title).setContentText(text)
+            .setContentIntent(pi).setAutoCancel(true)
+            .addAction(android.app.Notification.Action.Builder(null, "Connect", pi).build())
+            .build()
+        try { nm.notify(42, n) } catch (_: Exception) {}
+    }
+
     private fun maybeAutoDesktop(displayId: Int) {
-        if (!Settings2.autoDesktop(this)) return
         val d = dm.getDisplay(displayId) ?: return
         if (Displays.external(this).none { it.displayId == displayId }) return
+        getSystemService(android.app.NotificationManager::class.java).cancel(42)
+        if (!Settings2.autoDesktop(this)) { notifyConnect("Monitor connected", "Tap Connect to open the desktop on it."); return }
         if (DesktopActivity.current?.displayIdOrNull() == displayId) return
         if (lastAutoDisplay == displayId && DesktopActivity.current != null) return
         lastAutoDisplay = displayId

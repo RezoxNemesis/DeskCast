@@ -94,6 +94,11 @@
             android:theme="@style/Theme.DeskCast.Desktop" />
 
         <activity
+            android:name=".ConnectActivity"
+            android:exported="false"
+            android:launchMode="singleTop" />
+
+        <activity
             android:name=".AppProfilesActivity"
             android:exported="false" />
 
