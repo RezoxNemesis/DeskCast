@@ -252,7 +252,7 @@ class HdmiVideoActivity : Activity() {
             screens.isNotEmpty() -> {
                 statusLine.text = "External screen detected"
                 statusLine.setTextColor(Ui.OK)
-                statusDetail.text = "\${selected?.name ?: screens.first().name} · \${screens.size} Android display(s) available.\n$deviceDetail"
+                statusDetail.text = "${selected?.name ?: screens.first().name} · ${screens.size} Android display(s) available.\n$deviceDetail"
             }
             scan.displayLink -> {
                 statusLine.text = "DisplayLink adapter detected"
@@ -296,7 +296,7 @@ class HdmiVideoActivity : Activity() {
             showError("No Android external display is registered yet. Connect a compatible adapter or use Cast settings.")
             return
         }
-        val labels = screens.map { "\${it.name} (display \${it.displayId})" }.toTypedArray()
+        val labels = screens.map { "${it.name} (display ${it.displayId})" }.toTypedArray()
         AlertDialog.Builder(this).setTitle("Choose a connected screen").setItems(labels) { _, index ->
             val pos = currentPosition()
             chosenDisplayId = screens[index].displayId
@@ -376,7 +376,7 @@ class HdmiVideoActivity : Activity() {
             } catch (e: Exception) {
                 closeRemote()
                 preferExternal = false
-                showError("Android couldn't open the external screen: \${e.message ?: "unknown error"}")
+                showError("Android couldn't open the external screen: ${e.message ?: "unknown error"}")
                 startOutput(playbackPosition)
                 return
             }
@@ -430,7 +430,7 @@ class HdmiVideoActivity : Activity() {
 
     private fun updateOutputLabels() {
         val screen = remote?.display
-        outputLabel.text = if (screen != null) "Playing on \${screen.name}" else "Playing on phone"
+        outputLabel.text = if (screen != null) "Playing on ${screen.name}" else "Playing on phone"
         outputButton.text = if (screen != null) "Use phone screen" else "Use external screen"
     }
 
@@ -439,7 +439,7 @@ class HdmiVideoActivity : Activity() {
         if (motionMode) {
             progressBar.isEnabled = false
             progressBar.progress = 0
-            timeLabel.text = "Offline 30 FPS test scene · \${if (playing) "running" else "paused"}"
+            timeLabel.text = "Offline 30 FPS test scene · ${if (playing) "running" else "paused"}"
         } else {
             val duration = currentDuration().coerceAtLeast(0)
             val pos = currentPosition().coerceIn(0, max(0, duration))
@@ -448,7 +448,7 @@ class HdmiVideoActivity : Activity() {
                 progressBar.isEnabled = true
                 progressBar.max = duration
                 if (!scrubbing) progressBar.progress = pos
-                timeLabel.text = "\${formatTime(pos)} / \${formatTime(duration)}"
+                timeLabel.text = "${formatTime(pos)} / ${formatTime(duration)}"
             } else {
                 progressBar.isEnabled = false
                 timeLabel.text = "Opening video…"
