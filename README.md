@@ -70,3 +70,18 @@ After that, Shizuku isn't needed any more.
 ## Build
 
 GitHub Actions builds `app-release.apk` on every push (`.github/workflows/build.yml`). Locally: Android SDK 35 + Gradle 8.11, `gradle :app:assembleRelease`.
+
+
+## HDMI connection detector & video player
+
+Open **DeskCast → Start → HDMI detector, screen test & videos**. It is also linked from **Connect a monitor**.
+
+- Live scan of Android external displays and USB host accessories. **USB attached is not equivalent to HDMI video connected.** Detects USB DisplayLink vendor IDs and USB Billboard mode failures without claiming the TV is receiving a signal.
+- A built-in offline animated color/motion test, usable on the phone or on a detected Android external display.
+- Sample **online** videos (MDN CC0 flower, a 10-second Big Buck Bunny sample, the W3C Sintel trailer), plus a video picker for local phone files and direct HTTPS MP4 URLs. Samples may require internet and third-party sites to remain available.
+- Play/pause/seek, screen selection and automatic transfer to/from an external presentation display when Android exposes it. The app keeps the phone as the controller while video is shown on the external display.
+- Links to Android Cast settings and the official DisplayLink Presenter app.
+
+**Hardware restriction:** The app cannot create DisplayPort Alt Mode or a physical HDMI video signal on an unsupported USB-C port. An ordinary HDMI hub is not the same as a USB graphics adapter; a compatible DisplayLink dock requires its vendor's app. Android may report wireless or virtual external displays as well as wired HDMI; their transport cannot always be identified from the public API. Protected DRM video may not play on external/virtual displays.
+
+All diagnosis and offline animation runs on device, and the app does not upload personal videos. Video samples load from public HTTPS hosts when chosen.

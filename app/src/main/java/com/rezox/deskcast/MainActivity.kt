@@ -237,6 +237,7 @@ class MainActivity : Activity() {
                 "Plug in your USB‑C → HDMI adapter and tap Connect — DeskCast finds the monitor or tells you exactly what's wrong."))
             card.addView(Ui.button(c, "Connect a monitor", primary = true) { startActivity(Intent(c, ConnectActivity::class.java)) })
         }
+        card.addView(Ui.button(c, "HDMI detector, screen test & videos", primary = true) { startActivity(Intent(c, HdmiVideoActivity::class.java)) })
         card.addView(Ui.button(c, if (DesktopActivity.phoneCurrent != null) "Return to phone desktop" else "Phone desktop (no monitor)") {
             DesktopActivity.startPhoneDesktop(c)
         })

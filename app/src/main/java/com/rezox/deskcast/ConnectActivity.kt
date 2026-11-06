@@ -221,6 +221,7 @@ class ConnectActivity : Activity() {
             }
         }
         if (r.phoneHasDp == true && d == null) card.addView(Ui.text(c, "Good sign: this phone's USB‑C port supports video.", 13f, Ui.OK).apply { setPadding(0, Ui.dp(c, 8), 0, 0) })
+        card.addView(Ui.button(c, "Open HDMI video player & test") { startActivity(Intent(c, HdmiVideoActivity::class.java)) })
         body.addView(card)
 
         if (d == null) {
