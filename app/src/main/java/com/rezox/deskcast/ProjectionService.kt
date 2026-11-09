@@ -116,8 +116,9 @@ class ProjectionService : Service() {
             stopSelf(); return START_NOT_STICKY
         }
 
-        // Must be foreground (type mediaProjection) before asking for the projection.
-        startForeground(NOTIF_ID, notification(m), ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION)
+        // Must be foreground (type mediaProjection) before asking for the projection. Stream mode
+        // also needs the microphone type so phone sound keeps flowing while DeskCast is in the background.
+        startForeground(NOTIF_ID, notification(m), fgsType(m))
 
         releaseCapture()
         val mpm = getSystemService(MediaProjectionManager::class.java)
@@ -233,17 +234,26 @@ class ProjectionService : Service() {
         updateNotification()
     }
 
-    /** Starts sending phone sound to the PC (needs RECORD_AUDIO). Safe to call again after the permission is granted. */
+    private fun hasAudioPermission() = checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
+
+    private fun fgsType(m: String): Int =
+        if (m == MODE_STREAM && hasAudioPermission())
+            ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION or ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
+        else ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION
+
+        /** Starts sending phone sound to the PC (needs RECORD_AUDIO). Safe to call again after the permission is granted. */
     fun startAudio() {
         val p = projection ?: return
         val l = link ?: return
         if (mode != MODE_STREAM || audio != null) return
-        if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+        if (!hasAudioPermission()) {
             audioOn = false
             audioStatus = "Sound: off — allow audio for DeskCast to hear the phone on the PC."
             notifyState()
             return
         }
+        // Permission may have been granted after the service started: add the microphone type now.
+        try { startForeground(NOTIF_ID, notification(MODE_STREAM), fgsType(MODE_STREAM)) } catch (_: Exception) {}
         val a = AudioCapture(p) { data, len, pts -> l.onAudio(data, len, pts) }
         if (a.start()) {
             audio = a
