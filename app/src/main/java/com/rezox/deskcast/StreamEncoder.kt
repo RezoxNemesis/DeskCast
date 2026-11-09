@@ -15,6 +15,13 @@ import java.net.SocketException
 import java.util.concurrent.CopyOnWriteArrayList
 import kotlin.concurrent.thread
 
+/** Receives every encoded packet (called on the encoder thread; copy [data] if you keep it). */
+interface PacketListener {
+    /** A new encoder was started (first start or after a rotation) with this output size. */
+    fun onFormat(width: Int, height: Int)
+    fun onPacket(data: ByteArray, len: Int, ptsUs: Long, isConfig: Boolean, isKeyframe: Boolean)
+}
+
 /**
  * Hardware H.264 encoder tuned for latency (no B-frames, realtime priority, low-latency mode),
  * sending a raw Annex‑B stream to every TCP client. Any player that reads raw H.264 works,
@@ -42,6 +49,16 @@ class StreamEncoder(
         private set
 
     val clientCount get() = clients.size
+
+    /** Optional extra consumer of the encoded stream (the "Mirror to PC" link). */
+    @Volatile var listener: PacketListener? = null
+
+    /** Asks the encoder for an IDR frame as soon as possible. */
+    fun requestKeyframe() {
+        try {
+            codec?.setParameters(Bundle().apply { putInt(MediaCodec.PARAMETER_KEY_REQUEST_SYNC_FRAME, 0) })
+        } catch (_: Exception) {}
+    }
 
     fun describe() = "${size.width}×${size.height} · ${fps}fps · ${bitrate / 1_000_000} Mbps · $codecName"
 
@@ -126,6 +143,7 @@ class StreamEncoder(
         c.start()
         codec = c
         configData = null
+        try { listener?.onFormat(s.width, s.height) } catch (_: Exception) {}
         drainThread = thread(name = "deskcast-encoder", priority = Thread.MAX_PRIORITY) { drain(c) }
         return surface
     }
@@ -151,10 +169,11 @@ class StreamEncoder(
                 if (scratch.size < info.size) scratch = ByteArray(info.size * 2)
                 buf.position(info.offset); buf.limit(info.offset + info.size)
                 buf.get(scratch, 0, info.size)
-                if (info.flags and MediaCodec.BUFFER_FLAG_CODEC_CONFIG != 0) {
-                    configData = scratch.copyOf(info.size)
-                }
+                val isConfig = info.flags and MediaCodec.BUFFER_FLAG_CODEC_CONFIG != 0
+                val isKey = info.flags and MediaCodec.BUFFER_FLAG_KEY_FRAME != 0
+                if (isConfig) configData = scratch.copyOf(info.size)
                 broadcast(scratch, info.size)
+                try { listener?.onPacket(scratch, info.size, info.presentationTimeUs, isConfig, isKey) } catch (_: Exception) {}
             }
             try { c.releaseOutputBuffer(idx, false) } catch (_: IllegalStateException) { break }
             if (info.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM != 0) break
@@ -194,7 +213,7 @@ class StreamEncoder(
                     configData?.let { out.write(it); out.flush() }
                     clients += Client(sock, out)
                     // New viewer: ask for a keyframe right away so the picture appears instantly.
-                    codec?.setParameters(Bundle().apply { putInt(MediaCodec.PARAMETER_KEY_REQUEST_SYNC_FRAME, 0) })
+                    requestKeyframe()
                     onClientsChanged()
                 } catch (e: Exception) {
                     try { sock.close() } catch (_: Exception) {}

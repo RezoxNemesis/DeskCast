@@ -1,8 +1,8 @@
-name: Build APK
+name: Build APK and desktop app
 
 on:
   push:
-    branches: [main]
+    branches: [main, 'dev/**']
   workflow_dispatch:
 
 permissions:
@@ -10,6 +10,7 @@ permissions:
 
 jobs:
   build:
+    name: Android APK
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -36,11 +37,98 @@ jobs:
           name: DeskCast-apk
           path: out/*.apk
 
+  desktop:
+    name: DeskCast Mirror (Linux .deb + AppImage)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: desktop
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+
+      - name: Install system packages for tests
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends xvfb ffmpeg
+
+      - name: Install
+        run: |
+          npm ci
+          node node_modules/electron/install.js
+
+      - name: Unit tests (protocol, pairing, H.264 splitting)
+        run: npm test
+
+      - name: Package
+        run: |
+          npm version 1.0.${{ github.run_number }} --no-git-tag-version
+          npm run dist
+          ls -la dist
+
+      - name: Smoke test packaged app (Xvfb)
+        run: |
+          timeout 60 xvfb-run -a dist/linux-unpacked/deskcast-mirror --no-sandbox --smoke-test 2>&1 | tee smoke.log
+          grep -q DESKCAST_SMOKE_OK smoke.log
+
+      - name: Smoke test AppImage (Xvfb)
+        run: |
+          chmod +x dist/*.AppImage
+          timeout 60 xvfb-run -a "$(ls dist/*.AppImage)" --appimage-extract-and-run --no-sandbox --smoke-test 2>&1 | tee smoke-appimage.log
+          grep -q DESKCAST_SMOKE_OK smoke-appimage.log
+
+      - name: End-to-end test with a fake phone (H.264 + audio + rotation)
+        run: E2E_OUT=${{ runner.temp }}/e2e ./test/e2e.sh dist/linux-unpacked/deskcast-mirror
+
+      - name: Inspect .deb
+        run: dpkg-deb -I dist/*.deb && dpkg-deb -c dist/*.deb | grep -E 'deskcast-mirror$|\.desktop$'
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: DeskCast-Mirror-linux
+          path: |
+            desktop/dist/*.deb
+            desktop/dist/*.AppImage
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: e2e-screenshots
+          path: ${{ runner.temp }}/e2e/
+          if-no-files-found: ignore
+
+  release:
+    name: Publish release
+    needs: [build, desktop]
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: DeskCast-apk
+          path: out
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: DeskCast-Mirror-linux
+          path: out
+
+      - run: ls -la out
+
       - name: Publish release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v1.0.${{ github.run_number }}
           name: DeskCast v1.0.${{ github.run_number }}
-          body: Install the APK on your phone. See the README for the one-time setup.
-          files: out/*.apk
+          body: |
+            **Phone:** install `DeskCast-v1.0.${{ github.run_number }}.apk`. See the README for the one-time setup.
+
+            **PC (Linux) — Mirror to PC over Wi‑Fi:** install the `.deb` (`sudo apt install ./DeskCast-Mirror-*.deb`) or run the `.AppImage`.
+            On the phone tap **Mirror to PC**, open **DeskCast Mirror** on the PC, pick the phone and type the 6‑digit code once.
+          files: out/*
           make_latest: true

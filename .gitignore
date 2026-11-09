@@ -4,3 +4,7 @@ local.properties
 .idea/
 *.iml
 out/
+# desktop app (DeskCast Mirror)
+node_modules/
+desktop/dist/
+!desktop/build/

@@ -1,5 +1,6 @@
 package com.rezox.deskcast
 
+import android.Manifest
 import android.app.Activity
 import android.app.Notification
 import android.app.NotificationChannel
@@ -8,6 +9,7 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
 import android.hardware.display.DisplayManager
 import android.hardware.display.VirtualDisplay
@@ -25,7 +27,9 @@ import android.view.WindowManager
 /**
  * Owns the screen capture. Two modes:
  *  - MIRROR: phone screen → a surface on the external display (GPU only, no encoding, near-zero lag)
- *  - STREAM: phone screen → hardware H.264 encoder → TCP (USB via `adb forward`, or Wi‑Fi / USB tethering)
+ *  - STREAM: phone screen → hardware H.264 encoder → TCP (USB via `adb forward`, or Wi‑Fi / USB tethering).
+ *    Stream mode also runs the "Mirror to PC" link ([MirrorLink], port 27184, with sound) for the
+ *    DeskCast Mirror desktop app.
  */
 class ProjectionService : Service() {
 
@@ -76,6 +80,20 @@ class ProjectionService : Service() {
 
     val streamClients: Int get() = encoder?.clientCount ?: 0
     val streamInfo: String get() = encoder?.describe() ?: ""
+
+    private var link: MirrorLink? = null
+    private var audio: AudioCapture? = null
+
+    /** "Mirror to PC" state for the UI. */
+    val linkRunning: Boolean get() = link?.isRunning == true
+    val linkCode: String get() = link?.code ?: ""
+    val linkPcs: List<String> get() = link?.connectedPcs ?: emptyList()
+    var linkError: String? = null
+        private set
+    var audioOn = false
+        private set
+    var audioStatus: String = ""
+        private set
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -193,6 +211,13 @@ class ProjectionService : Service() {
     // ---------- stream ----------
 
     private fun startStream() {
+        val l = MirrorLink(
+            this,
+            rotationDegrees = { (dm.getDisplay(Display.DEFAULT_DISPLAY)?.rotation ?: 0) * 90 },
+            requestKeyframe = { encoder?.requestKeyframe() },
+            onChanged = { notifyState(); main.post { updateNotification() } },
+        )
+        linkError = try { l.start(); link = l; null } catch (e: Exception) { "Mirror to PC couldn't start: ${e.message}" }
         val enc = StreamEncoder(
             this, PORT,
             maxEdge = Settings2.streamMaxEdge(this),
@@ -201,8 +226,40 @@ class ProjectionService : Service() {
             onClientsChanged = { notifyState() },
         )
         encoder = enc
+        enc.listener = link
         val surface = enc.start(sourceSize)
         createVirtualDisplay(surface)
+        startAudio()
+        updateNotification()
+    }
+
+    /** Starts sending phone sound to the PC (needs RECORD_AUDIO). Safe to call again after the permission is granted. */
+    fun startAudio() {
+        val p = projection ?: return
+        val l = link ?: return
+        if (mode != MODE_STREAM || audio != null) return
+        if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+            audioOn = false
+            audioStatus = "Sound: off — allow audio for DeskCast to hear the phone on the PC."
+            notifyState()
+            return
+        }
+        val a = AudioCapture(p) { data, len, pts -> l.onAudio(data, len, pts) }
+        if (a.start()) {
+            audio = a
+            audioOn = true
+            l.setAudioFormat(AudioCapture.SAMPLE_RATE, AudioCapture.CHANNELS)
+            audioStatus = "Sound: on (48 kHz stereo). Some apps (e.g. DRM streaming apps) block capture and stay silent."
+        } else {
+            audioOn = false
+            audioStatus = "Sound: off — ${a.error}"
+        }
+        notifyState()
+    }
+
+    private fun updateNotification() {
+        val m = mode ?: return
+        try { getSystemService(NotificationManager::class.java).notify(NOTIF_ID, notification(m)) } catch (_: Exception) {}
     }
 
     private fun restartEncoder() {
@@ -219,6 +276,10 @@ class ProjectionService : Service() {
         try { dm.unregisterDisplayListener(rotationListener) } catch (_: Exception) {}
         try { vd?.release() } catch (_: Exception) {}
         vd = null
+        audio?.stop(); audio = null
+        audioOn = false; audioStatus = ""
+        encoder?.listener = null
+        link?.stop(); link = null
         encoder?.stop(); encoder = null
         try { projection?.stop() } catch (_: Exception) {}
         projection = null
@@ -245,7 +306,12 @@ class ProjectionService : Service() {
         val open = PendingIntent.getActivity(
             this, 2, Intent(this, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
-        val text = if (m == MODE_MIRROR) "Mirroring your phone to the external screen" else "Streaming on port $PORT"
+        val code = link?.code
+        val text = when {
+            m == MODE_MIRROR -> "Mirroring your phone to the external screen"
+            code != null -> "Mirror to PC · pairing code $code · USB port $PORT"
+            else -> "Streaming on port $PORT"
+        }
         return Notification.Builder(this, CHANNEL)
             .setSmallIcon(android.R.drawable.ic_menu_slideshow)
             .setContentTitle("DeskCast")

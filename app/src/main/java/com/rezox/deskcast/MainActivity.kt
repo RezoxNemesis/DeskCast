@@ -7,6 +7,7 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.graphics.Typeface
 import android.hardware.display.DisplayManager
 import android.media.projection.MediaProjectionManager
 import android.os.Build
@@ -31,6 +32,7 @@ class MainActivity : Activity() {
 
     private val REQ_MIRROR = 11
     private val REQ_STREAM = 12
+    private val REQ_AUDIO = 13
 
     private val main = Handler(Looper.getMainLooper())
     private lateinit var content: LinearLayout
@@ -121,6 +123,7 @@ class MainActivity : Activity() {
 
         renderSetup()
         renderStart()
+        renderMirrorPc()
         renderGames()
         renderStream()
         renderShortcuts()
@@ -248,6 +251,82 @@ class MainActivity : Activity() {
         card.addView(toggle("Open the desktop when a monitor is connected", Settings2.autoDesktop(c)) { Settings2.setAutoDesktop(c, it) })
         card.addView(toggle("Open phone desktop when a mouse or keyboard is connected", Settings2.autoPhoneDesktop(c)) { Settings2.setAutoPhoneDesktop(c, it) })
         content.addView(card)
+    }
+
+    private fun renderMirrorPc() {
+        val c = this
+        val ps = ProjectionService.instance
+        content.addView(Ui.section(c, "Mirror to PC (Wi‑Fi)"))
+        val card = Ui.card(c)
+        if (ps != null && ps.mode == ProjectionService.MODE_STREAM && ps.linkRunning) {
+            val pcs = ps.linkPcs
+            card.addView(Ui.statusRow(c, if (pcs.isNotEmpty()) true else null,
+                if (pcs.isNotEmpty()) "Mirroring to ${pcs.joinToString(", ")}" else "Ready — open DeskCast Mirror on the PC",
+                if (pcs.isNotEmpty()) ps.streamInfo else "Pick this phone (${Build.MODEL}) on the PC. A paired PC connects by itself."))
+            card.addView(Ui.text(c, "Pairing code (type it on the PC once)", 13f, Ui.MUTED).apply { setPadding(0, Ui.dp(c, 10), 0, 0) })
+            card.addView(TextView(c).apply {
+                text = ps.linkCode.chunked(3).joinToString(" ")
+                textSize = 46f; letterSpacing = 0.12f
+                typeface = Typeface.create(Typeface.MONOSPACE, Typeface.BOLD)
+                setTextColor(Ui.ACCENT); gravity = Gravity.CENTER
+                setPadding(0, Ui.dp(c, 4), 0, Ui.dp(c, 4))
+                setTextIsSelectable(true)
+            })
+            val ips = ipAddresses()
+            card.addView(Ui.text(c,
+                if (ips.isEmpty()) "No network found — connect the phone and the PC to the same Wi‑Fi."
+                else "Phone address: ${ips.joinToString(", ")} · port ${LinkProto.PORT}",
+                13f, Ui.MUTED).apply { setTextIsSelectable(true) })
+            card.addView(Ui.statusRow(c, if (ps.audioOn) true else null, ps.audioStatus.ifBlank { "Sound: starting…" }))
+            if (!ps.audioOn && checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+                card.addView(Ui.button(c, "Allow sound") { requestPermissions(arrayOf(Manifest.permission.RECORD_AUDIO), REQ_AUDIO) })
+            }
+            card.addView(Ui.button(c, "Stop mirroring") { ProjectionService.stop(c) })
+        } else {
+            card.addView(Ui.text(c,
+                "See and hear the phone on your computer over Wi‑Fi — videos, games, the whole screen, portrait or landscape exactly as the phone is held.\n\n" +
+                    "On the PC install DeskCast Mirror (the .deb from the DeskCast GitHub release), open it and pick this phone. The first time, type the 6‑digit code shown here.",
+                14f, Ui.MUTED))
+            ps?.linkError?.let { card.addView(Ui.text(c, it, 13f, Ui.BAD).apply { setPadding(0, Ui.dp(c, 6), 0, 0) }) }
+            if (ps?.mode == ProjectionService.MODE_MIRROR) {
+                card.addView(Ui.text(c, "Starting this stops mirroring to the monitor.", 13f, Ui.WARN).apply { setPadding(0, Ui.dp(c, 6), 0, 0) })
+            }
+            card.addView(Ui.button(c, "Mirror to PC", primary = true) { startMirrorToPc() })
+        }
+        val paired = PairedPcs.count(c)
+        if (paired > 0) {
+            card.addView(Ui.text(c, "Paired PCs: ${PairedPcs.names(c).joinToString(", ")}", 13f, Ui.MUTED).apply { setPadding(0, Ui.dp(c, 10), 0, 0) })
+            card.addView(Ui.button(c, "Forget paired PCs") {
+                AlertDialog.Builder(c, android.R.style.Theme_Material_Dialog_Alert)
+                    .setTitle("Forget paired PCs?")
+                    .setMessage("Every PC will have to type the pairing code again next time.")
+                    .setPositiveButton("Forget") { _, _ -> PairedPcs.forget(c); render() }
+                    .setNegativeButton("Cancel", null)
+                    .show()
+            })
+        }
+        content.addView(card)
+    }
+
+    private fun startMirrorToPc() {
+        if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+            // Ask for sound first; the screen capture prompt follows either way.
+            requestPermissions(arrayOf(Manifest.permission.RECORD_AUDIO), REQ_AUDIO)
+        } else requestCapture(REQ_STREAM)
+    }
+
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode != REQ_AUDIO) return
+        val granted = grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED
+        val ps = ProjectionService.instance
+        if (ps != null && ps.mode == ProjectionService.MODE_STREAM) {
+            if (granted) ps.startAudio()
+            render()
+            return
+        }
+        if (!granted) Toast.makeText(this, "No sound permission: the PC gets video only, sound stays on the phone.", Toast.LENGTH_LONG).show()
+        requestCapture(REQ_STREAM)
     }
 
     private fun renderGames() {

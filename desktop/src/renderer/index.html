@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self' blob:; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:"
+    />
+    <title>DeskCast Mirror</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <div id="app" class="view-home">
+      <!-- title bar for the start / connecting screens -->
+      <header class="titlebar">
+        <div class="brand">
+          <img src="../assets/icon.png" alt="" class="logo" />
+          <span>DeskCast <b>Mirror</b></span>
+        </div>
+        <div class="winbtns">
+          <button class="wb" data-act="min" title="Minimize">
+            <svg viewBox="0 0 24 24"><path d="M6 12h12" /></svg>
+          </button>
+          <button class="wb" data-act="max" title="Maximize">
+            <svg viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2" /></svg>
+          </button>
+          <button class="wb close" data-act="close" title="Close">
+            <svg viewBox="0 0 24 24"><path d="M7 7l10 10M17 7L7 17" /></svg>
+          </button>
+        </div>
+      </header>
+
+      <section id="home">
+        <div class="hero">
+          <h1>Your phone, on this screen.</h1>
+          <p class="muted">
+            Open <b>DeskCast</b> on the phone and tap <b>Mirror to PC</b>. Phones on the same Wi‑Fi show up here.
+          </p>
+        </div>
+        <div id="phones" class="grid"></div>
+        <div id="empty" class="empty glass">
+          <div class="radar"><span></span><span></span><span></span></div>
+          <div>
+            <div class="empty-title">Looking for phones…</div>
+            <div class="muted small">Same Wi‑Fi as this PC? Some routers block discovery — type the phone's address below.</div>
+          </div>
+        </div>
+        <div class="glass manual">
+          <div class="field">
+            <input id="manualHost" placeholder="Phone address, e.g. 192.168.1.23" spellcheck="false" autocomplete="off" />
+            <button id="manualGo" class="btn primary">Connect</button>
+          </div>
+          <button id="usbGo" class="btn ghost" title="Uses adb forward over a USB cable (needs USB debugging)">
+            <svg viewBox="0 0 24 24"><path d="M12 3v14M8 7l4-4 4 4M7 13v2a2 2 0 002 2h6a2 2 0 002-2v-2M12 17v4" /></svg>
+            USB (adb)
+          </button>
+        </div>
+        <p id="homeError" class="error"></p>
+        <p class="muted small foot">
+          Sound needs Android's audio permission for DeskCast. Some apps (e.g. DRM streaming apps) block capture.
+          <span id="pcName"></span>
+        </p>
+      </section>
+
+      <section id="connecting">
+        <div class="glass center-card">
+          <div class="spinner"></div>
+          <div id="connTitle" class="conn-title">Connecting…</div>
+          <div id="connStatus" class="muted small"></div>
+          <button id="connCancel" class="btn ghost">Cancel</button>
+        </div>
+      </section>
+
+      <div id="pair" class="modal">
+        <form class="glass pair-card" id="pairForm" autocomplete="off">
+          <div class="pair-icon">
+            <svg viewBox="0 0 24 24"><rect x="7" y="2.5" width="10" height="19" rx="2.5" /><path d="M11 18.5h2" /></svg>
+          </div>
+          <h2>Pair with <span id="pairName">your phone</span></h2>
+          <p class="muted small">Type the 6‑digit code shown in DeskCast on the phone. You only do this once.</p>
+          <input id="code" inputmode="numeric" maxlength="7" placeholder="••••••" />
+          <p id="pairError" class="error"></p>
+          <div class="row">
+            <button type="button" id="pairCancel" class="btn ghost">Cancel</button>
+            <button type="submit" id="pairGo" class="btn primary">Pair</button>
+          </div>
+        </form>
+      </div>
+
+      <section id="mirror">
+        <canvas id="screen"></canvas>
+        <div id="waiting" class="waiting">
+          <div class="spinner"></div>
+          <div class="muted small">Waiting for the picture…</div>
+        </div>
+        <div id="toolbar" class="toolbar glass">
+          <div class="tb-left">
+            <span class="live"></span>
+            <span id="phoneName" class="phone-name">Phone</span>
+          </div>
+          <div id="stats" class="stats"></div>
+          <div class="tb-right">
+            <button class="ib" id="bRotate" title="Lock window shape (don't follow phone rotation)">
+              <svg viewBox="0 0 24 24"><path d="M4 12a8 8 0 0113.7-5.6M20 4v4h-4M20 12a8 8 0 01-13.7 5.6M4 20v-4h4" /></svg>
+            </button>
+            <button class="ib" id="bTop" title="Always on top">
+              <svg viewBox="0 0 24 24"><path d="M9 3h6l-1 6 3 3H7l3-3-1-6zM12 12v9" /></svg>
+            </button>
+            <button class="ib" id="bShot" title="Screenshot (Ctrl+S) → ~/Pictures/DeskCast">
+              <svg viewBox="0 0 24 24"><path d="M4 8h3l2-3h6l2 3h3v11H4z" /><circle cx="12" cy="13" r="3.5" /></svg>
+            </button>
+            <div class="vol">
+              <button class="ib" id="bMute" title="Mute (M)">
+                <svg viewBox="0 0 24 24" class="on"><path d="M4 9h4l5-4v14l-5-4H4zM16.5 8.5a5 5 0 010 7M19 6a8.5 8.5 0 010 12" /></svg>
+                <svg viewBox="0 0 24 24" class="off"><path d="M4 9h4l5-4v14l-5-4H4zM17 9l5 6M22 9l-5 6" /></svg>
+              </button>
+              <input id="volume" type="range" min="0" max="1" step="0.01" value="1" title="Volume" />
+            </div>
+            <button class="ib" id="bFull" title="Full screen (F11, double-click)">
+              <svg viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" /></svg>
+            </button>
+            <button class="ib danger" id="bStop" title="Disconnect">
+              <svg viewBox="0 0 24 24"><path d="M12 3v8M6.3 6.3a8 8 0 1011.4 0" /></svg>
+            </button>
+            <span class="sep"></span>
+            <button class="ib" data-act="min" title="Minimize">
+              <svg viewBox="0 0 24 24"><path d="M6 12h12" /></svg>
+            </button>
+            <button class="ib close" data-act="close" title="Close">
+              <svg viewBox="0 0 24 24"><path d="M7 7l10 10M17 7L7 17" /></svg>
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <div id="toast" class="toast glass"></div>
+    </div>
+    <script src="app.js"></script>
+  </body>
+</html>
